@@ -20,7 +20,14 @@ end
 
 function toarray(X::SparseMatrixCSC, dX)
     dnzval = tangentdata(dX).nzval
-    return SparseMatrixCSC(X.m, X.n, X.colptr, X.rowval, dnzval)
+    # The inner constructor: the outer one checks the structure on every call, and may
+    # resize the buffers, which belong to X and its tangent.
+    return SparseMatrixCSC{eltype(dnzval), eltype(X.colptr)}(X.m, X.n, X.colptr, X.rowval, dnzval)
+end
+
+# The cotangent of the coefficient `x` has its type, so it is real for a real `x`.
+function project(x, dx)
+    return oftype(x, x isa Real ? real(dx) : dx)
 end
 
 function toarray(X::Adjoint, dX)

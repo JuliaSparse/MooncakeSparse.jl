@@ -3,10 +3,12 @@ using MooncakeSparse: toarray
 using Mooncake: Config, prepare_derivative_cache, prepare_gradient_cache,
                 zero_tangent, value_and_derivative!!, value_and_gradient!!,
                 Tangent
+using Mooncake
+using Mooncake.TestUtils: test_rule
 using LinearAlgebra
 using SparseArrays
 using SparseArrays: nonzeros
-using Random: randn!
+using Random: randn!, Xoshiro
 using Test
 
 function randtangent(A)
@@ -117,6 +119,67 @@ p = 0.3
             # mul!(C, Y, Hermitian{SparseMatrixCSC}) ignores the Hermitian wrapper
             # https://github.com/JuliaSparse/SparseArrays.jl/issues/688
         end
+    end
+end
+
+# Rectangular matrices, and the cotangent of the overwritten `C`.
+@testset "mul! (3-arg) and dot (3-arg), $T" for T in (Float64, ComplexF64)
+    rng = Xoshiro(123)
+    A = sprand(rng, T, 7, 5, 0.4)
+
+    @testset "$(typeof(L))" for L in (A, A', transpose(A), transpose(A)')
+        m, n = size(L)
+        test_rule(rng, mul!, randn(rng, T, m), L, randn(rng, T, n); is_primitive=true, perf_flag=:none)
+        test_rule(rng, mul!, randn(rng, T, m, 3), L, randn(rng, T, n, 3); is_primitive=true, perf_flag=:none)
+        test_rule(rng, mul!, randn(rng, T, 3, n), randn(rng, T, 3, m), L; is_primitive=true, perf_flag=:none)
+        test_rule(rng, dot, randn(rng, T, m), L, randn(rng, T, n); is_primitive=true, perf_flag=:none)
+    end
+end
+
+@testset "mul! (5-arg)" begin
+    rng = Xoshiro(123)
+
+    @testset "$T $(ndims_B == 1 ? "vector" : "matrix") α=$(typeof(α)) β=$(typeof(β))" for T in (Float64, Float32, ComplexF64, ComplexF32),
+            ndims_B in (1, 2),
+            (α, β) in (
+                (true, false),
+                (true, true),
+                (randn(rng, T), randn(rng, T)),
+                (real(T)(0.7), real(T)(-0.4)),
+                (T(1.3), false),
+                # coefficients of another precision than the arrays
+                (real(T) == Float64 ? Float32 : Float64).((0.7, -0.4)),
+            )
+
+        A = sprand(rng, T, 7, 5, 0.4)
+        B = ndims_B == 1 ? randn(rng, T, 5) : randn(rng, T, 5, 3)
+        C = ndims_B == 1 ? randn(rng, T, 7) : randn(rng, T, 7, 3)
+        test_rule(rng, mul!, C, A, B, α, β; is_primitive=true, perf_flag=:none)
+    end
+
+    # Finite differences are not reliable in half precision, so compare with Float64 instead.
+    @testset "Float16 agrees with Float64 (α=$α β=$β)" for (α, β) in (
+            (true, false), (true, true), (0.7, 0.3), (1.3, false)
+        )
+
+        A = sprand(rng, 7, 5, 0.4)
+        B = randn(rng, 5, 3)
+        C = randn(rng, 7, 3)
+        function loss(A, B, C, α, β)
+            C = copy(C)
+            mul!(C, A, B, α, β)
+            return sum(abs2, C)
+        end
+        to16(x) = x isa Bool ? x : Float16(x)
+        args64 = (A, B, C, α, β)
+        args16 = (Float16.(A), Float16.(B), Float16.(C), to16(α), to16(β))
+        cache64 = prepare_gradient_cache(loss, args64...)
+        cache16 = prepare_gradient_cache(loss, args16...)
+        _, (_, dA64, dB64, dC64) = value_and_gradient!!(cache64, loss, args64...)
+        _, (_, dA16, dB16, dC16) = value_and_gradient!!(cache16, loss, args16...)
+        @test dA16.fields.nzval ≈ dA64.fields.nzval rtol = 1e-2
+        @test dB16 ≈ dB64 rtol = 1e-2
+        @test dC16 ≈ dC64 rtol = 1e-2 atol = 1e-2
     end
 end
 

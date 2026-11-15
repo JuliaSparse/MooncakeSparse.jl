@@ -24,3 +24,9 @@ for SL in SPARSE_MATRIX_TYPES
     @eval Mooncake.frule!!(::Dual{typeof(rdivwith!)}, cdX::Dual{<:AbstractMatrix}, cdA::Dual{<:$SL}, cdF::Dual) = rdiv_fwd_impl!!(cdX, cdA, cdF)
     @eval Mooncake.rrule!!(::CoDual{typeof(rdivwith!)}, cdX::CoDual{<:AbstractMatrix}, cdA::CoDual{<:$SL}, cdF::CoDual) = rdiv_rev_impl!!(cdX, cdA, cdF)
 end
+
+# The five-argument `mul!(C, A, B, α, β)`, for a `SparseMatrixCSC` `A` with the element types
+# and coefficients of Mooncake's rule for dense `mul!`.
+@is_primitive MinimalCtx Tuple{typeof(mul!), StridedVecOrMat{T}, SparseMatrixCSC{T}, StridedVecOrMat{T}, Coefficient{T}, Coefficient{T}} where {T <: Union{BlasFloat, HalfFloat}}
+Mooncake.frule!!(::Dual{typeof(mul!)}, cdC::Dual{<:StridedVecOrMat{T}}, cdA::Dual{<:SparseMatrixCSC{T}}, cdB::Dual{<:StridedVecOrMat{T}}, cdα::Dual{<:Coefficient{T}}, cdβ::Dual{<:Coefficient{T}}) where {T <: Union{BlasFloat, HalfFloat}} = lmul_fwd_impl!!(cdC, cdA, cdB, cdα, cdβ)
+Mooncake.rrule!!(::CoDual{typeof(mul!)}, cdC::CoDual{<:StridedVecOrMat{T}}, cdA::CoDual{<:SparseMatrixCSC{T}}, cdB::CoDual{<:StridedVecOrMat{T}}, cdα::CoDual{<:Coefficient{T}}, cdβ::CoDual{<:Coefficient{T}}) where {T <: Union{BlasFloat, HalfFloat}} = lmul_rev_impl!!(cdC, cdA, cdB, cdα, cdβ)

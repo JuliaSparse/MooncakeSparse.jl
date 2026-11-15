@@ -20,7 +20,14 @@ end
 
 function toarray(X::SparseMatrixCSC, dX)
     dnzval = tangentdata(dX).nzval
-    return SparseMatrixCSC(X.m, X.n, X.colptr, X.rowval, dnzval)
+    # The inner constructor: the outer one checks the structure on every call, and may
+    # resize the buffers, which belong to X and its tangent.
+    return SparseMatrixCSC{eltype(dnzval), eltype(X.colptr)}(X.m, X.n, X.colptr, X.rowval, dnzval)
+end
+
+# The cotangent of the coefficient `x` has its type, so it is real for a real `x`.
+function project(x, dx)
+    return oftype(x, x isa Real ? real(dx) : dx)
 end
 
 function toarray(X::Adjoint, dX)
@@ -163,7 +170,7 @@ function selupd!(C::ConjSparse, A::AbstractVecOrMat, B::AbstractVecOrMat, α, β
 end
 
 function selupd_impl!(C::SparseMatrixCSC, A::AbstractVector, B::AbstractVector, α, β, ::Val{tA}, ::Val{cA}, ::Val{tB}, ::Val{cB}) where {tA, cA, tB, cB}
-    @assert size(C, 1) == size(C, 2) == length(A) == length(B)
+    @assert size(C) == (length(A), length(B))
 
     @inbounds for j in axes(C, 2)
         if cB === :C
@@ -231,23 +238,21 @@ function selupd_impl!(C::SparseMatrixCSC, A::AbstractVector, B::AbstractVector, 
 end
 
 function selupd_impl!(C::SparseMatrixCSC, A::AbstractMatrix, B::AbstractMatrix, α, β, tA::Val{TA}, cA::Val{CA}, tB::Val{TB}, cB::Val{CB}, args...) where {TA, CA, TB, CB}
-    @assert size(C, 1) == size(C, 2)
-
     if TA === :N && TB === :N
         @assert size(A, 1) == size(C, 1)
-        @assert size(B, 2) == size(C, 1)
+        @assert size(B, 2) == size(C, 2)
         @assert size(A, 2) == size(B, 1)
     elseif TA === :N && TB !== :N
         @assert size(A, 1) == size(C, 1)
-        @assert size(B, 1) == size(C, 1)
+        @assert size(B, 1) == size(C, 2)
         @assert size(A, 2) == size(B, 2)
     elseif TA !== :N && TB === :N
         @assert size(A, 2) == size(C, 1)
-        @assert size(B, 2) == size(C, 1)
+        @assert size(B, 2) == size(C, 2)
         @assert size(A, 1) == size(B, 1)
     else
         @assert size(A, 2) == size(C, 1)
-        @assert size(B, 1) == size(C, 1)
+        @assert size(B, 1) == size(C, 2)
         @assert size(A, 1) == size(B, 2)
     end
 

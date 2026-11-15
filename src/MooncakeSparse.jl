@@ -4,6 +4,9 @@ export toarray, ldivwith, ldivwith!, rdivwith, rdivwith!
 
 using LinearAlgebra
 using LinearAlgebra: Hermitian, Symmetric, Adjoint, Transpose, AdjOrTrans, rmul!, ldiv!, rdiv!, dot, axpy!, axpby!, mul!
+using LinearAlgebra: BlasFloat
+
+using Base: IEEEFloat
 
 using SparseArrays
 using SparseArrays: SparseMatrixCSC, nzrange, rowvals, getcolptr, nonzeros
@@ -13,7 +16,18 @@ using Base.Order: Forward
 using Mooncake
 using Mooncake: @is_primitive, MinimalCtx, CoDual, Dual, NoRData, NoFData, primal, tangent,
                 Tangent, FData, FriendlyTangentCache, AsCustomised,
-                friendly_tangent_cache, tangent_to_friendly_internal!!, zero_rdata
+                friendly_tangent_cache, tangent_to_friendly_internal!!, zero_rdata, arrayify
+
+# The element types of Mooncake's rule for dense `mul!`.
+@static if isdefined(Core, :BFloat16)
+    const HalfFloat = Union{Float16, Core.BFloat16}
+else
+    const HalfFloat = Float16
+end
+
+# As in Mooncake's rule for dense `mul!`, a coefficient is a `Bool`, a float, or of the
+# element type of the arrays.
+const Coefficient{T} = Union{Bool, IEEEFloat, T}
 
 const HermSparse{T, I} = Hermitian{T, SparseMatrixCSC{T, I}}
 const SymSparse{T, I} = Symmetric{T, SparseMatrixCSC{T, I}}

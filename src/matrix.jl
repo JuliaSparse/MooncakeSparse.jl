@@ -109,6 +109,8 @@ function lmul_rev_impl!!(cdC, cdA, cdB)
     function pullback!!(::NoRData)
         mul!(dB, A', dC, true, true)
         selupd!(dA, dC, B', true, true)
+        # The product overwrites C, so the old value of C has no cotangent.
+        fill!(dC, zero(eltype(dC)))
         copyto!(C, D)
 
         return NoRData(), NoRData(), NoRData(), NoRData()
@@ -167,6 +169,7 @@ function rmul_rev_impl!!(cdC, cdA, cdB)
     function pullback!!(::NoRData)
         mul!(dA, dC, B', true, true)
         selupd!(dB, A', dC, true, true)
+        fill!(dC, zero(eltype(dC)))
         copyto!(C, D)
 
         return NoRData(), NoRData(), NoRData(), NoRData()
@@ -183,7 +186,8 @@ function dot_rev_impl!!(cdx, cdA, cdy)
     z = dot(x, A, y)
 
     function pullback!!(Δz)
-        mul!(dx, A,  y, Δz, true)
+        # z is antilinear in x, so the cotangent of x takes conj(Δz).
+        mul!(dx, A,  y, conj(Δz), true)
         mul!(dy, A', x, Δz, true)
         selupd!(dA, x, y', Δz, true)
         return NoRData(), NoRData(), NoRData(), NoRData()

@@ -122,6 +122,20 @@ p = 0.3
     end
 end
 
+# Rectangular matrices, and the cotangent of the overwritten `C`.
+@testset "mul! (3-arg) and dot (3-arg), $T" for T in (Float64, ComplexF64)
+    rng = Xoshiro(123)
+    A = sprand(rng, T, 7, 5, 0.4)
+
+    @testset "$(typeof(L))" for L in (A, A', transpose(A), transpose(A)')
+        m, n = size(L)
+        test_rule(rng, mul!, randn(rng, T, m), L, randn(rng, T, n); is_primitive=true, perf_flag=:none)
+        test_rule(rng, mul!, randn(rng, T, m, 3), L, randn(rng, T, n, 3); is_primitive=true, perf_flag=:none)
+        test_rule(rng, mul!, randn(rng, T, 3, n), randn(rng, T, 3, m), L; is_primitive=true, perf_flag=:none)
+        test_rule(rng, dot, randn(rng, T, m), L, randn(rng, T, n); is_primitive=true, perf_flag=:none)
+    end
+end
+
 @testset "mul! (5-arg)" begin
     rng = Xoshiro(123)
 

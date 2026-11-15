@@ -170,7 +170,7 @@ function selupd!(C::ConjSparse, A::AbstractVecOrMat, B::AbstractVecOrMat, α, β
 end
 
 function selupd_impl!(C::SparseMatrixCSC, A::AbstractVector, B::AbstractVector, α, β, ::Val{tA}, ::Val{cA}, ::Val{tB}, ::Val{cB}) where {tA, cA, tB, cB}
-    @assert size(C, 1) == size(C, 2) == length(A) == length(B)
+    @assert size(C) == (length(A), length(B))
 
     @inbounds for j in axes(C, 2)
         if cB === :C
@@ -238,23 +238,21 @@ function selupd_impl!(C::SparseMatrixCSC, A::AbstractVector, B::AbstractVector, 
 end
 
 function selupd_impl!(C::SparseMatrixCSC, A::AbstractMatrix, B::AbstractMatrix, α, β, tA::Val{TA}, cA::Val{CA}, tB::Val{TB}, cB::Val{CB}, args...) where {TA, CA, TB, CB}
-    @assert size(C, 1) == size(C, 2)
-
     if TA === :N && TB === :N
         @assert size(A, 1) == size(C, 1)
-        @assert size(B, 2) == size(C, 1)
+        @assert size(B, 2) == size(C, 2)
         @assert size(A, 2) == size(B, 1)
     elseif TA === :N && TB !== :N
         @assert size(A, 1) == size(C, 1)
-        @assert size(B, 1) == size(C, 1)
+        @assert size(B, 1) == size(C, 2)
         @assert size(A, 2) == size(B, 2)
     elseif TA !== :N && TB === :N
         @assert size(A, 2) == size(C, 1)
-        @assert size(B, 2) == size(C, 1)
+        @assert size(B, 2) == size(C, 2)
         @assert size(A, 1) == size(B, 1)
     else
         @assert size(A, 2) == size(C, 1)
-        @assert size(B, 1) == size(C, 1)
+        @assert size(B, 1) == size(C, 2)
         @assert size(A, 1) == size(B, 2)
     end
 
